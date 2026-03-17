@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Archive, Eye, Radio, Trash2 } from "lucide-react";
 import type React from "react";
 import { getSceneDetails } from "../../api/moderatorApi";
@@ -28,6 +28,17 @@ type SceneTile = {
 
 const sceneTileCache = new Map<string, SceneTile[]>();
 
+const statusColor: Record<string, string> = {
+  READY: "bg-blue-500",
+  QUEUED: "bg-yellow-500",
+  LIVE: "bg-green-600 animate-pulse",
+  PLAYING: "bg-green-600 animate-pulse",
+  PLAYED: "bg-gray-500",
+  ARCHIVED: "bg-gray-500",
+  DRAFT: "bg-purple-600",
+  PREVIEW: "bg-pink-500",
+};
+
 function getPreviewGrid(count: number) {
   if (count <= 1) return { cols: 1, rows: 1 };
   if (count === 2) return { cols: 2, rows: 1 };
@@ -43,7 +54,7 @@ function normalizeSceneTiles(data: any): SceneTile[] {
   return Array.isArray(rawTiles) ? rawTiles : [];
 }
 
-function SceneMosaicThumbnail({
+const SceneMosaicThumbnail = memo(function SceneMosaicThumbnail({
   sceneId,
   fallbackThumbnail,
 }: {
@@ -79,6 +90,10 @@ function SceneMosaicThumbnail({
 
   useEffect(() => {
     if (!shouldLoad) return;
+    if (fallbackThumbnail) {
+      setLoading(false);
+      return;
+    }
 
     let active = true;
 
@@ -108,7 +123,7 @@ function SceneMosaicThumbnail({
     return () => {
       active = false;
     };
-  }, [refreshToken, sceneId, shouldLoad]);
+  }, [fallbackThumbnail, refreshToken, sceneId, shouldLoad]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -152,20 +167,18 @@ function SceneMosaicThumbnail({
               key={tile.tile_id || tile.submission_id || `${sceneId}-${index}`}
               className="overflow-hidden rounded-[10px] bg-slate-900"
             >
-              {mediaUrl ? (
-                <video
-                  src={mediaUrl}
-                  poster={thumbnailUrl || undefined}
-                  muted
-                  loop
-                  autoPlay
-                  playsInline
-                  preload="metadata"
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt="Scene tile preview"
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
+                  draggable={false}
                 />
               ) : (
                 <div className="flex h-full min-h-8 items-center justify-center bg-slate-900 text-[10px] text-white/35">
-                  Empty
+                  {mediaUrl ? "Video" : "Empty"}
                 </div>
               )}
             </div>
@@ -181,7 +194,10 @@ function SceneMosaicThumbnail({
         <img
           src={fallbackThumbnail}
           alt="Scene preview"
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          draggable={false}
         />
       </div>
     );
@@ -195,7 +211,7 @@ function SceneMosaicThumbnail({
       {shouldLoad && loading ? "Loading preview..." : "No preview"}
     </div>
   );
-}
+});
 
 export default function SceneThumbnailBar({
   scenes,
@@ -206,37 +222,38 @@ export default function SceneThumbnailBar({
   onLive,
   onArchive,
 }: Props) {
-  const statusColor: Record<string, string> = {
-    READY: "bg-blue-500",
-    QUEUED: "bg-yellow-500",
-    LIVE: "bg-green-600 animate-pulse",
-    PLAYING: "bg-green-600 animate-pulse",
-    PLAYED: "bg-gray-500",
-    ARCHIVED: "bg-gray-500",
-    DRAFT: "bg-purple-600",
-    PREVIEW: "bg-pink-500",
-  };
+  const handlePreview = useCallback(
+    async (e: React.MouseEvent, sceneId: string) => {
+      e.stopPropagation();
+      openNamedWindow(`/preview/${sceneId}`, PREVIEW_WINDOW_NAME);
+      await onPreview?.(sceneId);
+    },
+    [onPreview],
+  );
 
-  const handlePreview = async (e: React.MouseEvent, sceneId: string) => {
-    e.stopPropagation();
-    openNamedWindow(`/moderator/preview/${sceneId}`, PREVIEW_WINDOW_NAME);
-    await onPreview?.(sceneId);
-  };
+  const handleDelete = useCallback(
+    (e: React.MouseEvent, sceneId: string) => {
+      e.stopPropagation();
+      onDelete?.(sceneId);
+    },
+    [onDelete],
+  );
 
-  const handleDelete = (e: React.MouseEvent, sceneId: string) => {
-    e.stopPropagation();
-    onDelete?.(sceneId);
-  };
+  const handleLive = useCallback(
+    (e: React.MouseEvent, sceneId: string) => {
+      e.stopPropagation();
+      onLive?.(sceneId);
+    },
+    [onLive],
+  );
 
-  const handleLive = (e: React.MouseEvent, sceneId: string) => {
-    e.stopPropagation();
-    onLive?.(sceneId);
-  };
-
-  const handleArchive = (e: React.MouseEvent, sceneId: string) => {
-    e.stopPropagation();
-    onArchive?.(sceneId);
-  };
+  const handleArchive = useCallback(
+    (e: React.MouseEvent, sceneId: string) => {
+      e.stopPropagation();
+      onArchive?.(sceneId);
+    },
+    [onArchive],
+  );
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">

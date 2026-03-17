@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Film, LayoutPanelTop, ListVideo, Radio, SearchCheck, Sparkles } from "lucide-react";
 import FilterBar from "../components/FiltersPanel";
-import SceneNameModal from "../components/SceneNameModal";
 import SceneThumbnailBar from "../components/preview/SceneThumbnailBar";
 import SubmissionCard from "../components/SubmissionCard";
-import VideoPlayerModal from "../components/VideoPlayerModal";
+
+const SceneNameModal = lazy(() => import("../components/SceneNameModal"));
+const VideoPlayerModal = lazy(() => import("../components/VideoPlayerModal"));
 
 import {
   addToQueue,
@@ -354,13 +355,13 @@ export default function ModeratorDashboard() {
 
     if (!activeScene) {
       localStorage.setItem(LIVE_ACTIVE_KEY, sceneId);
-      window.open(`/moderator/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
+      window.open(`/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
       await loadScenes();
       return;
     }
 
     if (activeScene === sceneId) {
-      window.open(`/moderator/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
+      window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
       await loadScenes();
       return;
     }
@@ -372,7 +373,7 @@ export default function ModeratorDashboard() {
       localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
     }
 
-    window.open(`/moderator/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
+    window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
     await loadScenes();
   };
 
@@ -709,22 +710,26 @@ export default function ModeratorDashboard() {
       </div>
 
       {showModal && (
-        <SceneNameModal
-          open={showModal}
-          onClose={() => setShowModal(false)}
-          onSubmit={handleCreateScene}
-          scenes={scenes}
-        />
+        <Suspense fallback={null}>
+          <SceneNameModal
+            open={showModal}
+            onClose={() => setShowModal(false)}
+            onSubmit={handleCreateScene}
+            scenes={scenes}
+          />
+        </Suspense>
       )}
 
-      <VideoPlayerModal
-        open={playerOpen}
-        src={playerSubmission?.media_url ?? null}
-        title={playerSubmission?.user?.full_name || "Anonymous Fan"}
-        subtitle={playerSubmission?.team?.name || "Independent submission"}
-        status={playerSubmission?.status || "Pending"}
-        onClose={() => setPlayerOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <VideoPlayerModal
+          open={playerOpen}
+          src={playerSubmission?.media_url ?? null}
+          title={playerSubmission?.user?.full_name || "Anonymous Fan"}
+          subtitle={playerSubmission?.team?.name || "Independent submission"}
+          status={playerSubmission?.status || "Pending"}
+          onClose={() => setPlayerOpen(false)}
+        />
+      </Suspense>
 
       {deleteModalOpen && (
         <div

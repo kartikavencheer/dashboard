@@ -70,12 +70,12 @@ export default function ScenePreview() {
 
     if (!activeScene) {
       localStorage.setItem(LIVE_ACTIVE_KEY, sceneId);
-      window.open(`/moderator/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
+      window.open(`/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
       return;
     }
 
     if (activeScene === sceneId) {
-      window.open(`/moderator/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
+      window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
       return;
     }
 
@@ -86,7 +86,7 @@ export default function ScenePreview() {
       localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
     }
 
-    window.open(`/moderator/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
+    window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
   };
 
   return (
