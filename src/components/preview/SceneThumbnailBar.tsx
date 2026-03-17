@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from "react";
 import { Archive, Eye, Radio, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { getSceneDetails } from "../../api/moderatorApi";
+import { SCENE_THUMBNAIL_SYNC_KEY } from "../../utils/sceneRestore";
+import { openNamedWindow, PREVIEW_WINDOW_NAME } from "../../utils/windowTargets";
 
 type Props = {
   scenes: any[];
@@ -13,34 +15,186 @@ type Props = {
   onArchive?: (id: string) => void;
 };
 
-function getSceneMedia(scene: any) {
-  const candidates: any[] = []
-    .concat(scene?.submissions || [])
-    .concat(scene?.tiles || [])
-    .concat(scene?.scene_tiles || [])
-    .concat(scene?.media || []);
+type SceneTile = {
+  tile_id?: string;
+  submission_id?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  submission?: {
+    media_url?: string;
+    thumbnail_url?: string;
+  };
+};
 
-  return candidates
-    .map((item: any) => ({
-      key: String(item?.tile_id || item?.submission_id || item?.id || Math.random()),
-      thumb:
-        item?.thumbnail_url ||
-        item?.thumbnail ||
-        item?.thumb_url ||
-        item?.submission?.thumbnail_url ||
-        item?.submission?.thumbnail ||
-        null,
-      url:
-        item?.media_url ||
-        item?.url ||
-        item?.media ||
-        item?.mediaUrl ||
-        item?.submission?.media_url ||
-        item?.submission?.url ||
-        null,
-      type: String(item?.media_type || item?.type || "").toUpperCase(),
-    }))
-    .filter((x) => x.thumb || x.url);
+const sceneTileCache = new Map<string, SceneTile[]>();
+
+function getPreviewGrid(count: number) {
+  if (count <= 1) return { cols: 1, rows: 1 };
+  if (count === 2) return { cols: 2, rows: 1 };
+  if (count <= 4) return { cols: 2, rows: 2 };
+  if (count <= 6) return { cols: 3, rows: 2 };
+  if (count <= 9) return { cols: 3, rows: 3 };
+  if (count <= 12) return { cols: 4, rows: 3 };
+  return { cols: 4, rows: 4 };
+}
+
+function normalizeSceneTiles(data: any): SceneTile[] {
+  const rawTiles = Array.isArray(data) ? data : data?.tiles || data?.data || [];
+  return Array.isArray(rawTiles) ? rawTiles : [];
+}
+
+function SceneMosaicThumbnail({
+  sceneId,
+  fallbackThumbnail,
+}: {
+  sceneId: string;
+  fallbackThumbnail?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [tiles, setTiles] = useState<SceneTile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "220px 0px",
+      },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoad) return;
+
+    let active = true;
+
+    const loadTiles = async () => {
+      const cachedTiles = sceneTileCache.get(sceneId);
+      if (cachedTiles) {
+        setTiles(cachedTiles);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await getSceneDetails(sceneId);
+        if (!active) return;
+        const normalizedTiles = normalizeSceneTiles(data).slice(0, 16);
+        sceneTileCache.set(sceneId, normalizedTiles);
+        setTiles(normalizedTiles);
+      } catch (error) {
+        console.error("Failed to load scene thumbnail tiles:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadTiles();
+
+    return () => {
+      active = false;
+    };
+  }, [refreshToken, sceneId, shouldLoad]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== SCENE_THUMBNAIL_SYNC_KEY || !event.newValue) return;
+
+      try {
+        const payload = JSON.parse(event.newValue);
+        if (payload?.sceneId !== sceneId) return;
+        sceneTileCache.delete(sceneId);
+        setLoading(true);
+        setRefreshToken((value) => value + 1);
+      } catch {
+        sceneTileCache.delete(sceneId);
+        setLoading(true);
+        setRefreshToken((value) => value + 1);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [sceneId]);
+
+  if (!loading && tiles.length) {
+    const { cols, rows } = getPreviewGrid(tiles.length);
+
+    return (
+      <div
+        ref={containerRef}
+        className="grid h-full w-full gap-1.5 bg-slate-950 p-2"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+        }}
+      >
+        {tiles.slice(0, cols * rows).map((tile, index) => {
+          const mediaUrl = tile.media_url || tile.submission?.media_url || "";
+          const thumbnailUrl = tile.thumbnail_url || tile.submission?.thumbnail_url || "";
+
+          return (
+            <div
+              key={tile.tile_id || tile.submission_id || `${sceneId}-${index}`}
+              className="overflow-hidden rounded-[10px] bg-slate-900"
+            >
+              {mediaUrl ? (
+                <video
+                  src={mediaUrl}
+                  poster={thumbnailUrl || undefined}
+                  muted
+                  loop
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full min-h-8 items-center justify-center bg-slate-900 text-[10px] text-white/35">
+                  Empty
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (fallbackThumbnail) {
+    return (
+      <div ref={containerRef} className="h-full w-full">
+        <img
+          src={fallbackThumbnail}
+          alt="Scene preview"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex h-full w-full items-center justify-center bg-slate-950 text-xs text-gray-400"
+    >
+      {shouldLoad && loading ? "Loading preview..." : "No preview"}
+    </div>
+  );
 }
 
 export default function SceneThumbnailBar({
@@ -52,41 +206,6 @@ export default function SceneThumbnailBar({
   onLive,
   onArchive,
 }: Props) {
-  const [sceneDetails, setSceneDetails] = useState<Record<string, any[]>>({});
-  const requestedRef = useRef(new Set<string>());
-
-  const visibleSceneIds = useMemo(() => scenes.map((s) => String(s.scene_id)), [scenes]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchDetails = async () => {
-      // Keep it lightweight: fetch details for the first few scenes only.
-      // More can be fetched on-demand later if needed.
-      const idsToFetch = visibleSceneIds
-        .slice(0, 12)
-        .filter((id) => id && !sceneDetails[id] && !requestedRef.current.has(id));
-
-      for (const id of idsToFetch) {
-        requestedRef.current.add(id);
-        try {
-          const details = await getSceneDetails(id);
-          if (cancelled) return;
-          // API sometimes returns {data: [...]}, sometimes just [...]
-          const tiles = Array.isArray(details) ? details : details?.data || details?.value || [];
-          setSceneDetails((prev) => ({ ...prev, [id]: tiles }));
-        } catch {
-          // ignore; fallback UI will render
-        }
-      }
-    };
-
-    void fetchDetails();
-    return () => {
-      cancelled = true;
-    };
-  }, [visibleSceneIds, sceneDetails]);
-
   const statusColor: Record<string, string> = {
     READY: "bg-blue-500",
     QUEUED: "bg-yellow-500",
@@ -100,9 +219,8 @@ export default function SceneThumbnailBar({
 
   const handlePreview = async (e: React.MouseEvent, sceneId: string) => {
     e.stopPropagation();
-    const previewWindow = window.open(`/moderator/preview/${sceneId}`, "_blank");
+    openNamedWindow(`/moderator/preview/${sceneId}`, PREVIEW_WINDOW_NAME);
     await onPreview?.(sceneId);
-    previewWindow?.location.reload();
   };
 
   const handleDelete = (e: React.MouseEvent, sceneId: string) => {
@@ -127,19 +245,11 @@ export default function SceneThumbnailBar({
         const normalizedStatus = String(scene.status || "").toUpperCase();
         const uiStatus = normalizedStatus || "UNKNOWN";
         const isArchived = normalizedStatus === "ARCHIVED";
-        const details = sceneDetails[String(scene.scene_id)];
-        const rawMedia = getSceneMedia(details?.length ? { ...scene, tiles: details } : scene);
-        const media = Array.from(
-          new Map(rawMedia.map((m) => [m.thumb || m.url, m])).values(),
-        );
-
-        const maxCells = 16; // keep thumbnail lightweight (up to 4x4)
-        const visibleCount = Math.min(media.length, maxCells);
-        const gridSize = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(visibleCount || 1))));
-        const gridCols = gridSize;
-        const gridRows = gridSize;
-        const gridItems = media.slice(0, gridSize * gridSize);
-        const remaining = Math.max(0, media.length - gridItems.length);
+        const isLive = normalizedStatus === "LIVE" || normalizedStatus === "PLAYING";
+        const canPreview = !isLive;
+        const canLive = !isArchived && !isLive;
+        const canArchive = isLive;
+        const canDelete = true;
 
         return (
           <button
@@ -156,66 +266,9 @@ export default function SceneThumbnailBar({
             `}
           >
             <div className="glass-soft relative h-52 w-full overflow-hidden">
-              {gridItems.length ? (
-                <div
-                  className="h-full w-full overflow-hidden"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                    gridTemplateRows: `repeat(${gridRows}, 1fr)`,
-                    gap: "2px",
-                  }}
-                >
-                  {gridItems.map((item) =>
-                    item.thumb ? (
-                      <img
-                        key={item.key}
-                        src={item.thumb}
-                        alt={scene.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <video
-                        key={item.key}
-                        src={item.url}
-                        muted
-                        playsInline
-                        preload="metadata"
-                        className="h-full w-full object-cover"
-                      />
-                    ),
-                  )}
-                </div>
-              ) : !details && scene.thumbnail ? (
-                <img
-                  src={scene.thumbnail}
-                  alt={scene.name}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                />
-              ) : !details ? (
-                <div className="flex h-full w-full items-center justify-center bg-slate-950 text-xs text-gray-400">
-                  Loading grid...
-                </div>
-              ) : scene.thumbnail ? (
-                <img
-                  src={scene.thumbnail}
-                  alt={scene.name}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-slate-950 text-xs text-gray-400">
-                  No preview
-                </div>
-              )}
+              <SceneMosaicThumbnail sceneId={scene.scene_id} fallbackThumbnail={scene.thumbnail} />
 
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-
-              {remaining > 0 && (
-                <div className="absolute bottom-14 right-3 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[10px] font-semibold text-white/80 backdrop-blur">
-                  +{remaining}
-                </div>
-              )}
 
               <div
                 className={`
@@ -240,15 +293,17 @@ export default function SceneThumbnailBar({
                   transition-opacity duration-300
                 "
               >
-                <button
-                  onClick={(e) => handlePreview(e, scene.scene_id)}
-                  className="secondary-button px-3 py-2 text-xs"
-                >
-                  <Eye size={14} />
-                  Preview
-                </button>
+                {canPreview && (
+                  <button
+                    onClick={(e) => handlePreview(e, scene.scene_id)}
+                    className="secondary-button px-3 py-2 text-xs"
+                  >
+                    <Eye size={14} />
+                    Preview
+                  </button>
+                )}
 
-                {!isArchived && (
+                {canLive && (
                   <button
                     onClick={(e) => handleLive(e, scene.scene_id)}
                     className="primary-button px-3 py-2 text-xs"
@@ -258,7 +313,7 @@ export default function SceneThumbnailBar({
                   </button>
                 )}
 
-                {!isArchived && (
+                {canArchive && (
                   <button
                     onClick={(e) => handleArchive(e, scene.scene_id)}
                     className="secondary-button px-3 py-2 text-xs"
@@ -268,7 +323,7 @@ export default function SceneThumbnailBar({
                   </button>
                 )}
 
-                {(normalizedStatus === "DRAFT" || normalizedStatus === "PREVIEW") && (
+                {canDelete && (
                   <button
                     onClick={(e) => handleDelete(e, scene.scene_id)}
                     className="danger-button px-3 py-2 text-xs"
