@@ -6,7 +6,7 @@ function getGrid(count: number) {
   if (count === 1) return { cols: 1, rows: 1, centered: true };
   if (count === 2) return { cols: 2, rows: 1, centered: true };
   if (count === 3) return { cols: 3, rows: 1, centered: false };
-  if (count === 4) return { cols: 4, rows: 1, centered: false };
+  if (count === 4) return { cols: 4, rows: 1, centered: true, variant: "row" as const };
   if (count <= 8) return { cols: 4, rows: 2, centered: false };
   if (count <= 16) return { cols: 8, rows: 2, centered: false };
   if (count <= 20) return { cols: 10, rows: 2, centered: false };
@@ -35,22 +35,35 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
   if (!tiles.length) return null;
 
   const count = tiles.length;
-  const { cols, rows, centered } = getGrid(count);
+  const { cols, rows, centered, variant } = getGrid(count) as any;
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(83,182,255,0.14),transparent_26%),linear-gradient(180deg,#04070d,#000)]">
       <div className="flex-1 overflow-hidden">
         {centered ? (
-          <div className="flex h-full w-full items-center justify-center gap-3 p-3 md:p-4">
+          <div
+            className={
+              variant === "row"
+                ? "flex h-full w-full flex-wrap items-center justify-center gap-3 p-3 md:p-4"
+                : "flex h-full w-full items-center justify-center gap-3 p-3 md:p-4"
+            }
+          >
             {tiles.map((t, index) => (
               <div
                 key={t.tile_id ?? t.submission_id}
-                className="h-full"
-                style={{
-                  aspectRatio: "9/16",
-                  maxHeight: "100%",
-                  position: "relative",
-                }}
+                className={variant === "row" ? "relative" : "h-full"}
+                style={
+                  variant === "row"
+                    ? {
+                        width: "min(24vw, 320px)",
+                        aspectRatio: "9/16",
+                      }
+                    : {
+                        aspectRatio: "9/16",
+                        maxHeight: "100%",
+                        position: "relative",
+                      }
+                }
               >
                 <FanWallTile
                   submission={t}
@@ -91,13 +104,13 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
         )}
       </div>
 
-      <div className="ticker-shell flex h-11 shrink-0 items-center overflow-hidden px-4">
+      {/* <div className="ticker-shell flex h-11 shrink-0 items-center overflow-hidden px-4">
         <div
           className="animate-marquee inline-block whitespace-nowrap text-sm font-semibold text-white/75"
         >
           Welcome to CheerIT Fan Wall    Powered by CheerIT    Fan Engagement Live    Live Stream Powered by CheerIT Network
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

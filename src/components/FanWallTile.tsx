@@ -99,7 +99,7 @@ export default function FanWallTile({
         playsInline
         preload={src ? "metadata" : "none"}
         poster={thumbnailUrl || undefined}
-        className="w-full h-full object-cover"
+        className="h-full w-full object-contain"
       />
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 py-3 text-sm font-semibold text-white">
