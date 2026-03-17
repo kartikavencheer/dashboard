@@ -3,7 +3,7 @@ import { Archive, Eye, Radio, Trash2 } from "lucide-react";
 import type React from "react";
 import { getSceneDetails } from "../../api/moderatorApi";
 import { SCENE_THUMBNAIL_SYNC_KEY } from "../../utils/sceneRestore";
-import { openNamedWindow, PREVIEW_WINDOW_NAME } from "../../utils/windowTargets";
+import { openNamedWindow, PREVIEW_WINDOW_NAME, setPreviewScene } from "../../utils/windowTargets";
 
 type Props = {
   scenes: any[];
@@ -219,7 +219,9 @@ export default function SceneThumbnailBar({
 
   const handlePreview = async (e: React.MouseEvent, sceneId: string) => {
     e.stopPropagation();
-    openNamedWindow(`/preview/${sceneId}`, PREVIEW_WINDOW_NAME);
+    // Keep the preview tab stable (no reload) and swap just the scene via localStorage.
+    openNamedWindow(`/preview`, PREVIEW_WINDOW_NAME);
+    setPreviewScene(sceneId);
     await onPreview?.(sceneId);
   };
 

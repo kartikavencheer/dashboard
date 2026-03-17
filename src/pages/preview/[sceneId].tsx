@@ -5,7 +5,13 @@ import SceneRenderer from "../../components/SceneRenderer";
 import { useParams } from "react-router-dom";
 import { goLiveScene } from "../../api/mosaicLive.api";
 import { getSceneDetails } from "../../api/moderatorApi";
-import { LIVE_WINDOW_NAME, openNamedWindow } from "../../utils/windowTargets";
+import {
+  LIVE_WINDOW_NAME,
+  openNamedWindow,
+  PREVIEW_SCENE_ID_KEY,
+  PREVIEW_SCENE_UPDATED_KEY,
+  setPreviewScene,
+} from "../../utils/windowTargets";
 
 const LIVE_QUEUE_KEY = "fanwall_live_scene_queue";
 const LIVE_ACTIVE_KEY = "fanwall_live_active_scene";
@@ -32,20 +38,45 @@ function writeQueue(queue: string[]) {
 }
 
 export default function ScenePreview() {
-  const { sceneId } = useParams();
-  const [isMuted, setIsMuted] = useState(false);
+  const { sceneId: routeSceneId } = useParams();
+  const [sceneId, setSceneId] = useState<string | null>(routeSceneId ?? null);
+  const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
-    // Preview should start unmuted.
-    setIsMuted(false);
-    localStorage.setItem(AUDIO_MUTED_KEY, "false");
+    if (routeSceneId) {
+      setSceneId(routeSceneId);
+      setPreviewScene(routeSceneId);
+      return;
+    }
+
+    const readStored = () => localStorage.getItem(PREVIEW_SCENE_ID_KEY);
+    setSceneId(readStored());
+
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key !== PREVIEW_SCENE_UPDATED_KEY &&
+        event.key !== PREVIEW_SCENE_ID_KEY
+      ) {
+        return;
+      }
+      setSceneId(readStored());
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [routeSceneId]);
+
+  useEffect(() => {
+    // Preview should start muted so autoplay works reliably across browsers.
+    setIsMuted(true);
+    localStorage.setItem(AUDIO_MUTED_KEY, "true");
     localStorage.setItem("fanwall_audio_changed", String(Date.now()));
 
-    // Attempt to apply immediately; some browsers may still block autoplay-with-audio.
+    // Attempt to apply immediately.
     try {
       document.querySelectorAll("video").forEach((video) => {
         try {
-          video.muted = false;
+          video.muted = true;
           const p = video.play();
           if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => {});
         } catch {
@@ -79,9 +110,11 @@ export default function ScenePreview() {
     localStorage.setItem(AUDIO_MUTED_KEY, String(next));
     localStorage.setItem("fanwall_audio_changed", String(Date.now()));
 
-    // Apply immediately within the click gesture to avoid autoplay-with-audio restrictions.
+    // Apply immediately within the click gesture. If unmuted autoplay is blocked,
+    // fall back to muted playback so the grid doesn't appear "stuck".
     try {
-      document.querySelectorAll("video").forEach((video) => {
+      const videos = Array.from(document.querySelectorAll("video"));
+      videos.forEach((video) => {
         try {
           video.muted = next;
           if (!next) {
@@ -92,6 +125,42 @@ export default function ScenePreview() {
           // ignore
         }
       });
+
+      if (!next) {
+        const ensurePlayback = async () => {
+          try {
+            await Promise.all(
+              videos.map(async (video) => {
+                try {
+                  await video.play();
+                } catch {
+                  // ignore
+                }
+              }),
+            );
+          } catch {
+            // ignore
+          }
+
+          // If any video is still paused, revert to muted to allow autoplay.
+          const blocked = videos.some((video) => video.paused);
+          if (blocked) {
+            setIsMuted(true);
+            localStorage.setItem(AUDIO_MUTED_KEY, "true");
+            localStorage.setItem("fanwall_audio_changed", String(Date.now()));
+            videos.forEach((video) => {
+              try {
+                video.muted = true;
+                void video.play().catch(() => {});
+              } catch {
+                // ignore
+              }
+            });
+          }
+        };
+
+        void ensurePlayback();
+      }
     } catch {
       // ignore
     }
@@ -137,7 +206,13 @@ export default function ScenePreview() {
       />
 
       <div className="flex-1 overflow-hidden">
-        <SceneRenderer sceneId={sceneId!} allowDelete muted={isMuted} />
+        {sceneId ? (
+          <SceneRenderer sceneId={sceneId} allowDelete muted={isMuted} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-white/70">
+            Select a scene and click Preview to show it here.
+          </div>
+        )}
       </div>
 
       <Footer showSponsors sponsors={PREVIEW_SPONSORS} />
