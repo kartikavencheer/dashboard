@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Film, LayoutPanelTop, ListVideo, Radio, SearchCheck, Sparkles } from "lucide-react";
 import FilterBar from "../components/FiltersPanel";
+import Header from "../components/layout/Header";
 import SceneThumbnailBar from "../components/preview/SceneThumbnailBar";
 import SubmissionCard from "../components/SubmissionCard";
 
@@ -150,8 +151,9 @@ export default function ModeratorDashboard() {
     filters.search,
   ]);
 
-  const reloadSubmissions = async () => {
-    const subs = await getSubmissions(filters);
+  const reloadSubmissions = async (override?: Partial<typeof filters>) => {
+    const params = override ? { ...filters, ...override } : filters;
+    const subs = await getSubmissions(params);
     setSubmissions(subs || []);
   };
 
@@ -242,6 +244,38 @@ export default function ModeratorDashboard() {
       writeRecycleBin(filters.eventId, next);
       return next;
     });
+  };
+
+  const restoreAllRecycleBin = () => {
+    if (!filters.eventId) return;
+    setRecycleBin(() => {
+      writeRecycleBin(filters.eventId, []);
+      return [];
+    });
+    void reloadSubmissions();
+  };
+
+  const showAllFromDb = async () => {
+    if (!filters.eventId) return;
+
+    // Clear any frontend-only hiding (Recycle Bin) and clear UI filters so we fetch everything for the event.
+    setRecycleBin(() => {
+      writeRecycleBin(filters.eventId, []);
+      return [];
+    });
+
+    const nextFilters = {
+      ...filters,
+      teamId: "",
+      categoryId: "",
+      status: "",
+      search: "",
+    };
+
+    setFilters(nextFilters);
+
+    // Fetch from API using the cleared filters.
+    await Promise.all([reloadSubmissions(nextFilters), reloadQueue(), loadScenes()]);
   };
 
   const permanentlyDeleteTarget = async () => {
@@ -338,6 +372,8 @@ export default function ModeratorDashboard() {
     try {
       await deleteScene(sceneId);
       await loadScenes();
+      // Ensure any frontend-only hidden clips (Recycle Bin) are still visible after scene operations.
+      void reloadSubmissions();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete scene");
     }
@@ -400,8 +436,11 @@ export default function ModeratorDashboard() {
   };
 
   return (
-    <div className="app-shell">
-      <div className="app-content mx-auto flex min-h-screen w-full max-w-[1800px] flex-col gap-6 px-4 py-5 md:px-6 xl:px-8">
+    <div className="app-shell overflow-visible">
+      <div className="sticky top-0 z-50">
+        <Header title="MODERATOR DASHBOARD" color="green" />
+      </div>
+      <div className="app-content mx-auto flex min-h-screen w-full max-w-[1800px] flex-col gap-6 overflow-x-hidden px-4 py-5 md:px-6 xl:px-8">
         <section className="glass-panel rounded-[36px] p-6 md:p-8">
           <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -467,33 +506,68 @@ export default function ModeratorDashboard() {
               filters={filters}
               onChange={onChange as any}
             />
+
+            {Boolean(filters.eventId) && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-white/60">
+                  Showing DB results for: <span className="font-semibold text-white/85">{selectedEventName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={showAllFromDb}
+                  className="secondary-button px-4 py-3"
+                >
+                  Show All (DB)
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
         <div className="dashboard-grid min-h-0 flex-1">
-          <section className="glass-panel col-span-1 flex min-h-0 flex-col rounded-[32px] xl:col-span-8">
-            <div className="flex flex-col gap-4 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-              <div>
-                <div className="section-title">Submission Review</div>
-                <div className="section-subtitle">
-                  Moderate incoming fan cheers and choose the strongest moments for the live queue.
+            <section className="glass-panel col-span-1 flex min-h-0 flex-col rounded-[32px] xl:col-span-8">
+              <div className="flex flex-col gap-4 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between md:p-6">
+                <div>
+                  <div className="section-title">Submission Review</div>
+                  <div className="section-subtitle">
+                    Moderate incoming fan cheers and choose the strongest moments for the live queue.
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => setShowModal(true)}
+                  disabled={!queue.length}
+                  className="primary-button"
+                >
+                  <Film size={16} />
+                  {creatingScene ? "Creating..." : "Create Scene"}
+                </button>
               </div>
 
-              <button
-                onClick={() => setShowModal(true)}
-                disabled={!queue.length}
-                className="primary-button"
-              >
-                <Film size={16} />
-                {creatingScene ? "Creating..." : "Create Scene"}
-              </button>
-            </div>
+              {Boolean(filters.eventId && recycleBin.length) && (
+                <div className="mx-5 mt-5 flex flex-col gap-3 rounded-[24px] border border-cyan-300/15 bg-cyan-300/[0.06] px-5 py-4 text-white md:mx-6 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {recycleBin.length} clip{recycleBin.length === 1 ? "" : "s"} hidden in Recycle Bin
+                    </div>
+                    <div className="mt-1 text-xs text-white/60">
+                      These are hidden only on the frontend. Restore them to show again in the grid.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={restoreAllRecycleBin}
+                    className="secondary-button px-4 py-2 text-xs"
+                  >
+                    Restore All Clips
+                  </button>
+                </div>
+              )}
 
-            <div className="flex flex-col gap-3 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleSelectAll}
+              <div className="flex flex-col gap-3 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between md:p-6">
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleSelectAll}
                   disabled={!submissions.length}
                   className="secondary-button"
                 >
@@ -515,25 +589,44 @@ export default function ModeratorDashboard() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-5 md:p-6">
-              {submissions.length ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {submissions.filter((s) => !recycleIds.has(s.submission_id)).map((s) => {
+              <div className="flex-1 overflow-auto p-5 md:p-6">
+                {submissions.length ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {submissions.map((s) => {
+                    const isRecycled = recycleIds.has(s.submission_id);
                     const isQueued =
                       queueIds.has(s.submission_id) ||
                       Boolean(s.venueplayoutqueues && s.venueplayoutqueues.length > 0);
 
                     return (
-                      <SubmissionCard
-                        key={s.submission_id}
-                        submission={s}
-                        onAdd={handleAdd}
-                        onRemove={handleRemove}
-                        onReject={handleReject}
-                        isQueued={isQueued}
-                        onPlay={handlePlaySubmission}
-                        onDelete={handleDeleteClick}
-                      />
+                      <div key={s.submission_id} className="relative">
+                        {isRecycled && (
+                          <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+                            <div className="rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100 backdrop-blur">
+                              In Recycle Bin
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => restoreFromRecycleBin(s.submission_id)}
+                              className="rounded-full border border-cyan-300/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/20"
+                            >
+                              Restore
+                            </button>
+                          </div>
+                        )}
+
+                        <div className={isRecycled ? "opacity-60 grayscale-[0.25]" : ""}>
+                          <SubmissionCard
+                            submission={s}
+                            onAdd={handleAdd}
+                            onRemove={handleRemove}
+                            onReject={handleReject}
+                            isQueued={isQueued}
+                            onPlay={handlePlaySubmission}
+                            onDelete={handleDeleteClick}
+                          />
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -560,7 +653,18 @@ export default function ModeratorDashboard() {
                   <div className="section-title">Recycle Bin</div>
                   <div className="section-subtitle">Restore clips or permanently delete them.</div>
                 </div>
-                <div className="hero-chip">{recycleBin.length} items</div>
+                <div className="flex items-center gap-3">
+                  {Boolean(recycleBin.length) && (
+                    <button
+                      type="button"
+                      onClick={restoreAllRecycleBin}
+                      className="secondary-button px-4 py-2 text-xs"
+                    >
+                      Restore All
+                    </button>
+                  )}
+                  <div className="hero-chip">{recycleBin.length} items</div>
+                </div>
               </div>
 
               {!recycleBin.length ? (

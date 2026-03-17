@@ -12,6 +12,11 @@ const LIVE_ACTIVE_KEY = "fanwall_live_active_scene";
 const LIVE_EVENT_KEY = "fanwall_live_event_id";
 const AUDIO_MUTED_KEY = "fanwall_audio_muted";
 
+const PREVIEW_SPONSORS = [
+  { label: "Emirates", logoSrc: "/sponsors/emirate.png" },
+  { label: "Jio", logoSrc: "/sponsors/jio-logo-icon.png" },
+];
+
 function readQueue(): string[] {
   try {
     const raw = localStorage.getItem(LIVE_QUEUE_KEY);
@@ -119,9 +124,7 @@ export default function ScenePreview() {
         <SceneRenderer sceneId={sceneId!} allowDelete muted={isMuted} />
       </div>
 
-      <Footer />
+      <Footer showSponsors sponsors={PREVIEW_SPONSORS} />
     </div>
   );
 }
-
-

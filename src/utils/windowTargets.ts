@@ -1,6 +1,9 @@
 export const PREVIEW_WINDOW_NAME = "fanwall_scene_preview";
 export const LIVE_WINDOW_NAME = "fanwall_live_screen";
 
+export const PREVIEW_SCENE_ID_KEY = "fanwall_preview_scene_id";
+export const PREVIEW_SCENE_UPDATED_KEY = "fanwall_preview_scene_updated";
+
 export function openNamedWindow(url: string, name: string) {
   // Prefer reusing an existing named tab/window.
   // Opening an empty window first also keeps the call within the user gesture,
@@ -21,8 +24,16 @@ export function openNamedWindow(url: string, name: string) {
   } else {
     try {
       const target = new URL(url, window.location.href).toString();
-      // Use replace to avoid growing the history stack inside the named tab.
-      w.location.replace(target);
+      // Avoid reloading the tab if it's already on the same route.
+      try {
+        if (w.location?.href !== target) {
+          // Use replace to avoid growing the history stack inside the named tab.
+          w.location.replace(target);
+        }
+      } catch {
+        // Cross-origin or inaccessible; fall back to navigation.
+        w.location.replace(target);
+      }
     } catch {
       try {
         w.location.href = url;
@@ -40,4 +51,9 @@ export function openNamedWindow(url: string, name: string) {
     }
   }
   return w;
+}
+
+export function setPreviewScene(sceneId: string) {
+  localStorage.setItem(PREVIEW_SCENE_ID_KEY, sceneId);
+  localStorage.setItem(PREVIEW_SCENE_UPDATED_KEY, String(Date.now()));
 }

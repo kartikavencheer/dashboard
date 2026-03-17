@@ -28,6 +28,7 @@ export default function App() {
       >
         <Routes>
           <Route path="/" element={<ModeratorDashboard />} />
+          <Route path="/preview" element={<ScenePreview />} />
           <Route path="/preview/:sceneId" element={<ScenePreview />} />
           <Route path="/LiveScreen/:sceneId" element={<LiveScreen />} />
           <Route path="/FanWallLivePage/:sceneId" element={<FanWallLivePage />} />

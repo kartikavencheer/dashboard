@@ -223,3 +223,28 @@
 .animate-marquee {
   animation: marquee 26s linear infinite;
 }
+
+@keyframes sponsor-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--sponsor-shift, -50%));
+  }
+}
+
+.sponsor-marquee {
+  animation: sponsor-scroll 4s linear infinite;
+  will-change: transform;
+}
+
+.sponsor-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-marquee {
+    animation: none;
+    transform: none;
+  }
+}
