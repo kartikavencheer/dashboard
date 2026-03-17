@@ -5,6 +5,7 @@ import SceneRenderer from "../../components/SceneRenderer";
 import { useParams } from "react-router-dom";
 import { goLiveScene } from "../../api/mosaicLive.api";
 import { getSceneDetails } from "../../api/moderatorApi";
+import { LIVE_WINDOW_NAME, openNamedWindow } from "../../utils/windowTargets";
 
 const LIVE_QUEUE_KEY = "fanwall_live_scene_queue";
 const LIVE_ACTIVE_KEY = "fanwall_live_active_scene";
@@ -30,8 +31,9 @@ export default function ScenePreview() {
   const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
-    const raw = localStorage.getItem(AUDIO_MUTED_KEY);
-    setIsMuted(raw === null ? true : raw === "true");
+    // Always start muted so autoplay works reliably.
+    // Only unmute after an explicit user action (toggle button).
+    setIsMuted(true);
   }, []);
 
   useEffect(() => {
@@ -55,38 +57,52 @@ export default function ScenePreview() {
     setIsMuted(next);
     localStorage.setItem(AUDIO_MUTED_KEY, String(next));
     localStorage.setItem("fanwall_audio_changed", String(Date.now()));
+
+    // Apply immediately within the click gesture to avoid autoplay-with-audio restrictions.
+    try {
+      document.querySelectorAll("video").forEach((video) => {
+        try {
+          video.muted = next;
+          if (!next) {
+            const p = video.play();
+            if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      });
+    } catch {
+      // ignore
+    }
   };
 
   const handleGoLive = async () => {
     if (!sceneId) return;
 
+    const activeScene = localStorage.getItem(LIVE_ACTIVE_KEY);
+
+    if (!activeScene) {
+      localStorage.setItem(LIVE_ACTIVE_KEY, sceneId);
+      openNamedWindow(`/FanWallLivePage/${sceneId}`, LIVE_WINDOW_NAME);
+    } else if (activeScene === sceneId) {
+      openNamedWindow(`/FanWallLivePage/${activeScene}`, LIVE_WINDOW_NAME);
+    } else {
+      const queue = readQueue();
+      if (!queue.includes(sceneId)) {
+        queue.push(sceneId);
+        writeQueue(queue);
+        localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
+      }
+
+      openNamedWindow(`/FanWallLivePage/${activeScene}`, LIVE_WINDOW_NAME);
+    }
+
+    // Fire the API call after opening the tab so the click stays a user gesture.
     try {
       await goLiveScene(sceneId);
     } catch (err) {
       console.error("goLiveScene failed:", err);
     }
-
-    const activeScene = localStorage.getItem(LIVE_ACTIVE_KEY);
-
-    if (!activeScene) {
-      localStorage.setItem(LIVE_ACTIVE_KEY, sceneId);
-      window.open(`/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
-      return;
-    }
-
-    if (activeScene === sceneId) {
-      window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
-      return;
-    }
-
-    const queue = readQueue();
-    if (!queue.includes(sceneId)) {
-      queue.push(sceneId);
-      writeQueue(queue);
-      localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
-    }
-
-    window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
   };
 
   return (

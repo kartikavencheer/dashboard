@@ -39,13 +39,15 @@ export default function FanWallLivePage() {
   const [liveEventId, setLiveEventId] = useState("");
 
   useEffect(() => {
-    const raw = localStorage.getItem(AUDIO_MUTED_KEY);
-    setIsMuted(raw === null ? true : raw === "true");
+    // Always start muted so autoplay works reliably.
+    // Only unmute after an explicit user action (toggle button).
+    setIsMuted(true);
 
     const onStorage = (e: StorageEvent) => {
       if (e.key === AUDIO_MUTED_KEY || e.key === "fanwall_audio_changed") {
         const latest = localStorage.getItem(AUDIO_MUTED_KEY);
-        setIsMuted(latest === null ? true : latest === "true");
+        // Allow remote "mute" actions to sync, but don't auto-unmute (no user gesture).
+        if (latest === null || latest === "true") setIsMuted(true);
       }
     };
 
@@ -58,6 +60,23 @@ export default function FanWallLivePage() {
     setIsMuted(next);
     localStorage.setItem(AUDIO_MUTED_KEY, String(next));
     localStorage.setItem("fanwall_audio_changed", String(Date.now()));
+
+    // Apply immediately within the click gesture to avoid autoplay-with-audio restrictions.
+    try {
+      document.querySelectorAll("video").forEach((video) => {
+        try {
+          video.muted = next;
+          if (!next) {
+            const p = video.play();
+            if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      });
+    } catch {
+      // ignore
+    }
   };
 
   useEffect(() => {

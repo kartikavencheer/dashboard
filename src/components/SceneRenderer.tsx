@@ -23,7 +23,8 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
 
   const load = async () => {
     const data = await getSceneDetails(sceneId);
-    setTiles((data || []).slice(0, 36));
+    const resolvedTiles = Array.isArray(data) ? data : data?.tiles || data?.data || [];
+    setTiles((resolvedTiles || []).slice(0, 36));
   };
 
   const handleDelete = async (tileId: string) => {
@@ -41,7 +42,7 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
       <div className="flex-1 overflow-hidden">
         {centered ? (
           <div className="flex h-full w-full items-center justify-center gap-3 p-3 md:p-4">
-            {tiles.map((t) => (
+            {tiles.map((t, index) => (
               <div
                 key={t.tile_id ?? t.submission_id}
                 className="h-full"
@@ -56,6 +57,7 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
                   tile_id={t.tile_id}
                   onDelete={allowDelete ? handleDelete : undefined}
                   muted={muted}
+                  startDelayMs={Math.min(index, 12) * 120}
                 />
               </div>
             ))}
@@ -71,7 +73,7 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
               padding: "12px",
             }}
           >
-            {tiles.slice(0, cols * rows).map((t) => (
+            {tiles.slice(0, cols * rows).map((t, index) => (
               <div
                 key={t.tile_id ?? t.submission_id}
                 className="relative overflow-hidden rounded-[24px]"
@@ -81,6 +83,7 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
                   tile_id={t.tile_id}
                   onDelete={allowDelete ? handleDelete : undefined}
                   muted={muted}
+                  startDelayMs={Math.min(index, 12) * 120}
                 />
               </div>
             ))}

@@ -24,6 +24,7 @@ import {
 } from "../api/moderatorApi";
 import { Submission } from "../types/moderator.types";
 import { archiveScene, goLiveScene } from "../api/mosaicLive.api";
+import { LIVE_WINDOW_NAME, openNamedWindow } from "../utils/windowTargets";
 
 const LIVE_QUEUE_KEY = "fanwall_live_scene_queue";
 const LIVE_ACTIVE_KEY = "fanwall_live_active_scene";
@@ -349,31 +350,33 @@ export default function ModeratorDashboard() {
 
   const handleLiveScene = async (sceneId: string) => {
     localStorage.setItem(LIVE_EVENT_KEY, filters.eventId);
-    await goLiveScene(sceneId);
 
     const activeScene = localStorage.getItem(LIVE_ACTIVE_KEY);
 
+    let targetSceneForScreen = activeScene || sceneId;
+
     if (!activeScene) {
       localStorage.setItem(LIVE_ACTIVE_KEY, sceneId);
-      window.open(`/FanWallLivePage/${sceneId}`, "fanwall_live_screen");
-      await loadScenes();
-      return;
+      targetSceneForScreen = sceneId;
+    } else if (activeScene !== sceneId) {
+      const sceneQueue = readQueue();
+      if (!sceneQueue.includes(sceneId)) {
+        sceneQueue.push(sceneId);
+        writeQueue(sceneQueue);
+        localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
+      }
+      targetSceneForScreen = activeScene;
     }
 
-    if (activeScene === sceneId) {
-      window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
-      await loadScenes();
-      return;
+    // Open/reuse the live screen tab immediately (before awaits) to avoid pop-up blockers.
+    openNamedWindow(`/FanWallLivePage/${targetSceneForScreen}`, LIVE_WINDOW_NAME);
+
+    try {
+      await goLiveScene(sceneId);
+    } catch (err) {
+      console.error("goLiveScene failed:", err);
     }
 
-    const sceneQueue = readQueue();
-    if (!sceneQueue.includes(sceneId)) {
-      sceneQueue.push(sceneId);
-      writeQueue(sceneQueue);
-      localStorage.setItem("fanwall_live_queue_updated", String(Date.now()));
-    }
-
-    window.open(`/FanWallLivePage/${activeScene}`, "fanwall_live_screen");
     await loadScenes();
   };
 

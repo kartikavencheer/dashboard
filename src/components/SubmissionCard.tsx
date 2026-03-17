@@ -76,7 +76,7 @@ export default function SubmissionCard({
       onMouseLeave={() => setHovered(false)}
     >
       <div
-        className="relative h-44 cursor-pointer overflow-hidden bg-black"
+        className={`relative h-44 cursor-pointer overflow-hidden bg-black ${playing ? "flex items-center justify-center" : ""}`}
         onClick={openPlayer}
         onMouseEnter={handleVideoHoverStart}
         onMouseLeave={handleVideoHoverEnd}
@@ -87,7 +87,11 @@ export default function SubmissionCard({
           muted
           playsInline
           preload="metadata"
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          className={
+            playing
+              ? "h-full aspect-[9/16] object-contain"
+              : "h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          }
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/10 to-transparent" />
@@ -111,9 +115,7 @@ export default function SubmissionCard({
         )}
 
         <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
-          <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75 backdrop-blur-md">
-            Rank {submission?.rank ?? "-"}
-          </div>
+      
           <div className="rounded-full border border-sky-300/25 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold text-sky-100 backdrop-blur-md">
             {submission.team?.name || "Open Team"}
           </div>
