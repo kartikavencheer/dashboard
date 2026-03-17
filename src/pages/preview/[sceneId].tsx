@@ -33,12 +33,28 @@ function writeQueue(queue: string[]) {
 
 export default function ScenePreview() {
   const { sceneId } = useParams();
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
-    // Always start muted so autoplay works reliably.
-    // Only unmute after an explicit user action (toggle button).
-    setIsMuted(true);
+    // Preview should start unmuted.
+    setIsMuted(false);
+    localStorage.setItem(AUDIO_MUTED_KEY, "false");
+    localStorage.setItem("fanwall_audio_changed", String(Date.now()));
+
+    // Attempt to apply immediately; some browsers may still block autoplay-with-audio.
+    try {
+      document.querySelectorAll("video").forEach((video) => {
+        try {
+          video.muted = false;
+          const p = video.play();
+          if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => {});
+        } catch {
+          // ignore
+        }
+      });
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {

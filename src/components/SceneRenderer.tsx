@@ -91,13 +91,13 @@ export default function SceneRenderer({ sceneId, allowDelete, muted = true }: an
         )}
       </div>
 
-      {/* <div className="ticker-shell flex h-11 shrink-0 items-center overflow-hidden px-4">
+      <div className="ticker-shell flex h-11 shrink-0 items-center overflow-hidden px-4">
         <div
           className="animate-marquee inline-block whitespace-nowrap text-sm font-semibold text-white/75"
         >
           Welcome to CheerIT Fan Wall    Powered by CheerIT    Fan Engagement Live    Live Stream Powered by CheerIT Network
         </div>
-      </div> */}
+      </div>
     </div>
   );
 }
