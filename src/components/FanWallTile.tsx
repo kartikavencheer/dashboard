@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { resolveMediaUrl, resolveThumbnailUrl } from "../utils/remoteAssets";
 
 type Props = {
   submission: any;
@@ -24,7 +25,7 @@ export default function FanWallTile({
   const [shouldLoad, setShouldLoad] = useState(false);
   const [src, setSrc] = useState<string>("");
 
-  const mediaUrl =
+  const rawMediaUrl =
     submission?.media_url ||
     submission?.submission?.media_url ||
     submission?.video_url ||
@@ -32,12 +33,15 @@ export default function FanWallTile({
     submission?.url ||
     "";
 
-  const thumbnailUrl =
+  const rawThumbnailUrl =
     submission?.thumbnail_url ||
     submission?.submission?.thumbnail_url ||
     submission?.poster_url ||
     submission?.submission?.poster_url ||
     "";
+
+  const mediaUrl = resolveMediaUrl(rawMediaUrl);
+  const thumbnailUrl = resolveThumbnailUrl(rawThumbnailUrl);
 
   const userName =
     submission?.user_name ||

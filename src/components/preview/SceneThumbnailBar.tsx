@@ -4,6 +4,7 @@ import type React from "react";
 import { getSceneDetails } from "../../api/moderatorApi";
 import { SCENE_THUMBNAIL_SYNC_KEY } from "../../utils/sceneRestore";
 import { openNamedWindow, PREVIEW_WINDOW_NAME, setPreviewScene } from "../../utils/windowTargets";
+import { resolveMediaUrl, resolveThumbnailUrl } from "../../utils/remoteAssets";
 
 type Props = {
   scenes: any[];
@@ -144,8 +145,8 @@ function SceneMosaicThumbnail({
         }}
       >
         {tiles.slice(0, cols * rows).map((tile, index) => {
-          const mediaUrl = tile.media_url || tile.submission?.media_url || "";
-          const thumbnailUrl = tile.thumbnail_url || tile.submission?.thumbnail_url || "";
+          const mediaUrl = resolveMediaUrl(tile.media_url || tile.submission?.media_url || "");
+          const thumbnailUrl = resolveThumbnailUrl(tile.thumbnail_url || tile.submission?.thumbnail_url || "");
 
           return (
             <div
@@ -176,10 +177,11 @@ function SceneMosaicThumbnail({
   }
 
   if (fallbackThumbnail) {
+    const resolvedFallbackThumbnail = resolveThumbnailUrl(fallbackThumbnail);
     return (
       <div ref={containerRef} className="h-full w-full">
         <img
-          src={fallbackThumbnail}
+          src={resolvedFallbackThumbnail}
           alt="Scene preview"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
         />
