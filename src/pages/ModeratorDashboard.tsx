@@ -15,6 +15,7 @@ import {
   deleteScene,
   getCategories,
   getEvents,
+  getPlayedSubmissions,
   getQueue,
   getScenes,
   getSubmissions,
@@ -83,6 +84,7 @@ export default function ModeratorDashboard() {
   const [teams, setTeams] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [playedSubmissions, setPlayedSubmissions] = useState<Submission[]>([]);
   const [queue, setQueue] = useState<any[]>([]);
   const [scenes, setScenes] = useState<any[]>([]);
   const [activeSceneId, setActiveSceneId] = useState("");
@@ -112,6 +114,7 @@ export default function ModeratorDashboard() {
       setTeams([]);
       setCategories([]);
       setSubmissions([]);
+      setPlayedSubmissions([]);
       setQueue([]);
       setScenes([]);
       setRecycleBin([]);
@@ -128,13 +131,14 @@ export default function ModeratorDashboard() {
   useEffect(() => {
     if (!filters.eventId) return;
     reloadSubmissions();
+    reloadPlayed();
   }, [filters]);
   useEffect(() => {
     if (!filters.eventId) return;
 
     const poll = async () => {
       try {
-        await Promise.all([reloadSubmissions(), reloadQueue(), loadScenes()]);
+        await Promise.all([reloadSubmissions(), reloadPlayed(), reloadQueue(), loadScenes()]);
       } catch (error) {
         console.error("Dashboard polling failed:", error);
       }
@@ -153,8 +157,23 @@ export default function ModeratorDashboard() {
 
   const reloadSubmissions = async (override?: Partial<typeof filters>) => {
     const params = override ? { ...filters, ...override } : filters;
+    if (String(params?.status || "").toUpperCase() === "PLAYED") {
+      // Fetch played clips when "PLAYED" is selected in Status filter.
+      const { status: _ignoredStatus, ...rest } = params as any;
+      const subs = await getPlayedSubmissions(rest);
+      setSubmissions(subs || []);
+      return;
+    }
+
     const subs = await getSubmissions(params);
     setSubmissions(subs || []);
+  };
+
+  const reloadPlayed = async (override?: Partial<typeof filters>) => {
+    const params = override ? { ...filters, ...override } : filters;
+    const { status: _ignoredStatus, ...rest } = params as any;
+    const subs = await getPlayedSubmissions(rest);
+    setPlayedSubmissions(subs || []);
   };
 
   const reloadQueue = async (eventId = filters.eventId) => {
@@ -717,6 +736,76 @@ export default function ModeratorDashboard() {
                                 Delete
                               </button>
                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="glass-panel rounded-[32px] p-5 md:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="section-title">Played Clips</div>
+                  <div className="section-subtitle">Recently played videos fetched from the backend.</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => reloadPlayed()}
+                    disabled={!filters.eventId}
+                    className="secondary-button px-4 py-2 text-xs"
+                  >
+                    Refresh
+                  </button>
+                  <div className="hero-chip">{playedSubmissions.length} items</div>
+                </div>
+              </div>
+
+              {!playedSubmissions.length ? (
+                <div className="glass-soft rounded-[24px] px-5 py-6 text-sm text-white/55">
+                  No played clips found for the current filters.
+                </div>
+              ) : (
+                <div className="max-h-72 overflow-auto rounded-[24px] border border-white/8 bg-white/[0.03]">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-slate-950/95 text-left text-[11px] uppercase tracking-[0.18em] text-white/45 backdrop-blur">
+                      <tr>
+                        <th className="px-4 py-3">Fan</th>
+                        <th className="px-4 py-3">Team</th>
+                        <th className="px-4 py-3">Played</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {playedSubmissions.map((s: any) => (
+                        <tr
+                          key={s?.submission_id || s?.id || `${s?.media_url || "media"}-${s?.created_at || "time"}`}
+                          className="border-t border-white/8 text-white/80"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="max-w-[160px] truncate font-medium">
+                              {s?.user?.full_name || "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="max-w-[140px] truncate text-white/55">
+                              {s?.team?.name || "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-white/55">
+                            {s?.played_at || s?.playedAt || s?.updated_at || s?.created_at || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handlePlaySubmission(s)}
+                              className="rounded-full border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+                            >
+                              Play
+                            </button>
                           </td>
                         </tr>
                       ))}

@@ -252,6 +252,7 @@ export default function FilterBar({
               <option value="PENDING">Pending</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
+              <option value="PLAYED">Played</option>
             </select>
             <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45">
               <BadgeCheck size={16} />

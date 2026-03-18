@@ -24,6 +24,21 @@ export const getSubmissions = async (params: any = {}) => {
   }
 };
 
+export const getPlayedSubmissions = async (params: any = {}) => {
+  try {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API}/submissions/played?${query}`);
+
+    if (!res.ok) throw new Error("Failed to fetch played submissions");
+
+    const json = await res.json();
+    return json.data || json.submissions || json.items || json || [];
+  } catch (err) {
+    console.error("getPlayedSubmissions error:", err);
+    return [];
+  }
+};
+
 export const addToQueue = (eventId: string, submissionId: string) =>
   fetch(`${API}/queue`, {
     method: "POST",
