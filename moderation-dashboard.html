@@ -1,0 +1,279 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Moderation Dashboard</title>
+
+    <style>
+      body {
+        background: #1c1f26;
+        font-family: Arial;
+        color: white;
+        margin: 0;
+        padding: 20px;
+      }
+
+      h2 {
+        margin-top: 30px;
+      }
+
+      /* GRID */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+
+      /* CARD */
+      .card {
+        background: #2b2f3a;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        transition: 0.2s;
+      }
+
+      .card:hover {
+        transform: translateY(-4px);
+      }
+
+      /* THUMBNAIL */
+      .thumb {
+        position: relative;
+        height: 130px;
+        cursor: pointer;
+      }
+
+      .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .play {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px 14px;
+        border-radius: 50%;
+        font-size: 18px;
+      }
+
+      /* CATEGORY BAR */
+      .category {
+        padding: 6px 10px;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .four {
+        background: #e6c74c;
+        color: #111;
+      }
+      .six {
+        background: #9fc4e8;
+        color: #111;
+      }
+      .goal {
+        background: #c13a3a;
+      }
+      .defence {
+        background: #4caf50;
+      }
+
+      /* INFO */
+      .info {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 10px;
+        font-size: 14px;
+        color: #ddd;
+      }
+
+      /* BUTTONS */
+      .actions {
+        display: flex;
+        gap: 6px;
+        padding: 8px 10px 12px;
+      }
+
+      button {
+        border: none;
+        padding: 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: white;
+      }
+
+      .approve {
+        flex: 1;
+        background: #4caf50;
+      }
+      .reject {
+        width: 40px;
+        background: #444;
+      }
+
+      /* PANELS */
+      .panel {
+        margin-top: 30px;
+      }
+
+      /* MODAL */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      video {
+        max-width: 80%;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>📥 Submissions</h2>
+    <div class="grid" id="submissionGrid"></div>
+
+    <h2>🟡 Queue</h2>
+    <div class="grid" id="queueGrid"></div>
+
+    <h2>🔴 Live</h2>
+    <div class="grid" id="liveGrid"></div>
+
+    <!-- PREVIEW MODAL -->
+    <div class="modal" id="previewModal" onclick="closePreview()">
+      <video id="previewVideo" controls></video>
+    </div>
+
+    <script>
+      const submissions = [
+        {
+          id: 1,
+          name: "Rahul",
+          score: 89,
+          category: "four",
+          thumb: "https://i.imgur.com/8Km9tLL.jpg",
+          video: "sample.mp4",
+        },
+        {
+          id: 2,
+          name: "Ankit",
+          score: 95,
+          category: "six",
+          thumb: "https://i.imgur.com/5tj6S7O.jpg",
+          video: "sample.mp4",
+        },
+        {
+          id: 3,
+          name: "Priya",
+          score: 80,
+          category: "goal",
+          thumb: "https://i.imgur.com/2DhmtJ4.jpg",
+          video: "sample.mp4",
+        },
+      ];
+
+      let queue = [];
+      let live = [];
+
+      function renderCards(list, container, type) {
+        container.innerHTML = "";
+        list.forEach((item) => {
+          container.innerHTML += `
+      <div class="card">
+
+        <div class="thumb" onclick="preview('${item.video}')">
+          <img src="${item.thumb}">
+          <div class="play">▶</div>
+        </div>
+
+        <div class="category ${item.category}">
+          ${capitalize(item.category)}
+          <span>✔</span>
+        </div>
+
+        <div class="info">
+          <span>${item.name}</span>
+          <span>🔥 ${item.score}</span>
+        </div>
+
+        <div class="actions">
+          ${
+            type === "submission"
+              ? `<button class="approve" onclick="approve(${item.id})">Approve</button>
+             <button class="reject" onclick="reject(${item.id})">✕</button>`
+              : type === "queue"
+                ? `<button class="approve" onclick="pushLive(${item.id})">Push Live</button>`
+                : `LIVE`
+          }
+        </div>
+
+      </div>
+    `;
+        });
+      }
+
+      function capitalize(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+
+      function approve(id) {
+        const item = submissions.find((x) => x.id === id);
+        queue.push(item);
+        remove(submissions, id);
+        update();
+      }
+
+      function reject(id) {
+        remove(submissions, id);
+        update();
+      }
+
+      function pushLive(id) {
+        const item = queue.find((x) => x.id === id);
+        live.push(item);
+        remove(queue, id);
+        update();
+      }
+
+      function remove(arr, id) {
+        const i = arr.findIndex((x) => x.id === id);
+        if (i > -1) arr.splice(i, 1);
+      }
+
+      function preview(src) {
+        const modal = document.getElementById("previewModal");
+        const video = document.getElementById("previewVideo");
+        video.src = src;
+        modal.style.display = "flex";
+      }
+
+      function closePreview() {
+        document.getElementById("previewModal").style.display = "none";
+      }
+
+      function update() {
+        renderCards(
+          submissions,
+          document.getElementById("submissionGrid"),
+          "submission",
+        );
+        renderCards(queue, document.getElementById("queueGrid"), "queue");
+        renderCards(live, document.getElementById("liveGrid"), "live");
+      }
+
+      update();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,250 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --bg: #07111f;
+    --bg-elevated: rgba(12, 23, 40, 0.82);
+    --bg-soft: rgba(18, 32, 56, 0.72);
+    --border: rgba(149, 176, 255, 0.18);
+    --border-strong: rgba(149, 176, 255, 0.3);
+    --text: #edf4ff;
+    --text-soft: #a9bbda;
+    --accent: #53b6ff;
+    --accent-2: #82f7c8;
+    --danger: #ff6b7a;
+    --warning: #ffd166;
+    --shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  * {
+    @apply border-transparent;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: "Plus Jakarta Sans", "Segoe UI Variable", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(83, 182, 255, 0.18), transparent 32%),
+      radial-gradient(circle at top right, rgba(130, 247, 200, 0.12), transparent 24%),
+      radial-gradient(circle at bottom center, rgba(91, 94, 255, 0.16), transparent 28%),
+      linear-gradient(180deg, #08101d 0%, #091524 42%, #050b13 100%);
+    background-attachment: fixed;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(83, 182, 255, 0.35);
+    color: white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(83, 182, 255, 0.7), rgba(130, 247, 200, 0.5));
+    border-radius: 999px;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen relative overflow-hidden;
+  }
+
+  .app-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 92%);
+  }
+
+  .app-content {
+    @apply relative z-10;
+  }
+
+  .glass-panel {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(20px);
+  }
+
+  .glass-soft {
+    background: var(--bg-soft);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+  }
+
+  .dashboard-grid {
+    @apply grid grid-cols-1 gap-6 xl:grid-cols-12;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-white;
+  }
+
+  .section-subtitle {
+    color: var(--text-soft);
+    @apply text-sm;
+  }
+
+  .hero-chip {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em];
+    background: rgba(130, 247, 200, 0.1);
+    border: 1px solid rgba(130, 247, 200, 0.28);
+    color: #c9ffe8;
+  }
+
+  .stat-card {
+    @apply rounded-3xl p-4 md:p-5;
+    background: linear-gradient(180deg, rgba(12, 24, 43, 0.88), rgba(9, 18, 33, 0.72));
+    border: 1px solid rgba(149, 176, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .metric-label {
+    color: var(--text-soft);
+    @apply text-xs font-semibold uppercase tracking-[0.18em];
+  }
+
+  .metric-value {
+    @apply mt-3 text-3xl font-bold text-white;
+    font-family: "Space Grotesk", sans-serif;
+  }
+
+  .form-control {
+    @apply h-12 rounded-2xl px-4 text-sm text-white outline-none transition;
+    background: rgba(8, 16, 30, 0.9);
+    border: 1px solid rgba(149, 176, 255, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .form-control::placeholder {
+    color: rgba(169, 187, 218, 0.72);
+  }
+
+  .form-control:hover,
+  .form-control:focus {
+    border-color: rgba(83, 182, 255, 0.48);
+    box-shadow:
+      0 0 0 4px rgba(83, 182, 255, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-950 transition duration-200 disabled:cursor-not-allowed disabled:opacity-40;
+    background: linear-gradient(135deg, var(--accent-2), #67d6ff 55%, #82aaff 100%);
+    box-shadow: 0 20px 45px rgba(83, 182, 255, 0.28);
+  }
+
+  .primary-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 24px 50px rgba(83, 182, 255, 0.35);
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white transition duration-200 disabled:cursor-not-allowed disabled:opacity-40;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(149, 176, 255, 0.16);
+  }
+
+  .secondary-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(149, 176, 255, 0.3);
+  }
+
+  .danger-button {
+    @apply inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold text-white transition duration-200 disabled:cursor-not-allowed disabled:opacity-40;
+    background: linear-gradient(135deg, rgba(255, 107, 122, 0.9), rgba(255, 140, 102, 0.78));
+  }
+
+  .surface-outline {
+    border: 1px solid rgba(149, 176, 255, 0.16);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ticker-shell {
+    background: linear-gradient(90deg, rgba(5, 12, 22, 0.96), rgba(9, 20, 35, 0.88));
+    border-top: 1px solid rgba(149, 176, 255, 0.14);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 26s linear infinite;
+}
+
+@keyframes sponsor-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--sponsor-shift, -50%));
+  }
+}
+
+.sponsor-marquee {
+  animation: sponsor-scroll 4s linear infinite;
+  will-change: transform;
+}
+
+.sponsor-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-marquee {
+    animation: none;
+    transform: none;
+  }
+}
