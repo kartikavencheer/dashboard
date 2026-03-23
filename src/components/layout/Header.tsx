@@ -1,5 +1,6 @@
 import { Radio, Volume2, VolumeX } from "lucide-react";
 import logo from "../../assets/CheerITLogo9.png";
+import { getModLoggedInSummary } from "../../utils/modAuth";
 
 export default function Header({
   title,
@@ -7,17 +8,24 @@ export default function Header({
   onGoLive,
   isMuted,
   onToggleMute,
+  onLogout,
 }: {
   title: string;
   color?: "green" | "red";
   onGoLive?: () => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onLogout?: () => void;
 }) {
   const accent =
     color === "red"
       ? "from-rose-500/90 via-orange-400/80 to-amber-300/70"
       : "from-emerald-400/80 via-cyan-400/70 to-blue-500/70";
+
+  const loggedInSummary = onLogout ? getModLoggedInSummary() : null;
+  const showUserChip = Boolean(
+    onLogout && loggedInSummary && (loggedInSummary.displayName || loggedInSummary.role),
+  );
 
   return (
     <div className="relative overflow-hidden border-b border-white/10 bg-slate-950/70 px-5 py-4 text-white backdrop-blur-xl md:px-8">
@@ -40,6 +48,27 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-4">
+          {showUserChip && (
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 md:inline-flex">
+              <span className="text-white/55">Signed in:</span>
+              <span className="max-w-[180px] truncate text-white">
+                {loggedInSummary?.displayName}
+              </span>
+              {loggedInSummary?.role && (
+                <span className="text-white/45">({loggedInSummary.role})</span>
+              )}
+            </div>
+          )}
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="secondary-button px-3 py-2"
+            >
+              Logout
+            </button>
+          )}
+
           {onToggleMute && (
             <button
               onClick={onToggleMute}

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import SceneRenderer from "../components/SceneRenderer";
+import SceneTimedSequence from "../components/SceneTimedSequence";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
-import { getSceneDetails } from "../api/moderatorApi";
 import { getLiveOrLastScene, goLiveScene } from "../api/mosaicLive.api";
 
 const LIVE_QUEUE_KEY = "fanwall_live_scene_queue";
@@ -12,9 +11,10 @@ const LIVE_HISTORY_KEY = "fanwall_live_scene_history";
 const ARCHIVED_SCENES_KEY = "fanwall_archived_scene_ids";
 const LIVE_EVENT_KEY = "fanwall_live_event_id";
 const AUDIO_MUTED_KEY = "fanwall_audio_muted";
-const DEFAULT_SCENE_MS = 20000;
+const DEFAULT_LIVE_SCENE_MS = 30_000;
+const SCENE_DURATION_MS_KEY_PREFIX = "fanwall_scene_duration_ms_";
 
-// FIX: Define sponsors here so the live page footer matches the preview footer
+// Keep the existing bottom sponsor ticker footer for Live.
 const LIVE_SPONSORS = [
   { label: "Emirates", logoSrc: "/sponsors/emirate.png" },
   { label: "Jio", logoSrc: "/sponsors/jio-logo-icon.png" },
@@ -34,6 +34,17 @@ function writeArray(key: string, value: string[]) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function readSceneDurationMs(sceneId: string) {
+  if (!sceneId) return DEFAULT_LIVE_SCENE_MS;
+  try {
+    const raw = localStorage.getItem(`${SCENE_DURATION_MS_KEY_PREFIX}${sceneId}`) || "";
+    const ms = Number(raw);
+    return Number.isFinite(ms) && ms >= 6000 ? Math.round(ms) : DEFAULT_LIVE_SCENE_MS;
+  } catch {
+    return DEFAULT_LIVE_SCENE_MS;
+  }
+}
+
 export default function FanWallLivePage() {
   const { sceneId } = useParams();
   const navigate = useNavigate();
@@ -43,7 +54,6 @@ export default function FanWallLivePage() {
   const lastLivePollLogAtRef = useRef<number>(0);
 
   const [currentSceneId, setCurrentSceneId] = useState(sceneId || "");
-  const [sceneDurationMs, setSceneDurationMs] = useState(DEFAULT_SCENE_MS);
   const [isMuted, setIsMuted] = useState(true);
   const [liveEventId, setLiveEventId] = useState("");
 
@@ -180,20 +190,6 @@ export default function FanWallLivePage() {
       }
     }
 
-    const loadDuration = async () => {
-      try {
-        const data = await getSceneDetails(currentSceneId);
-        const tiles = Array.isArray(data) ? data : data?.tiles || data?.data || [];
-        const maxSeconds = tiles.reduce((max: number, t: any) => {
-          const sec = Number(t?.duration_seconds || t?.submission?.duration_seconds || 0);
-          return Math.max(max, sec);
-        }, 0);
-        setSceneDurationMs(maxSeconds > 0 ? (maxSeconds + 1) * 1000 : DEFAULT_SCENE_MS);
-      } catch {
-        setSceneDurationMs(DEFAULT_SCENE_MS);
-      }
-    };
-    loadDuration();
   }, [currentSceneId]);
 
   const goToScene = (nextScene: string) => {
@@ -205,9 +201,10 @@ export default function FanWallLivePage() {
   useEffect(() => {
     if (!currentSceneId) return;
     if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => { void goNextScene(); }, sceneDurationMs);
+    const durationMs = readSceneDurationMs(currentSceneId);
+    timerRef.current = window.setTimeout(() => { void goNextScene(); }, durationMs);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
-  }, [currentSceneId, sceneDurationMs]);
+  }, [currentSceneId]);
 
   useEffect(() => {
     const onBeforeUnload = () => { localStorage.removeItem(LIVE_ACTIVE_KEY); };
@@ -235,7 +232,7 @@ export default function FanWallLivePage() {
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <SceneRenderer sceneId={currentSceneId} muted={isMuted} />
+        <SceneTimedSequence sceneId={currentSceneId} muted={isMuted} />
       </div>
 
       {/*

@@ -1,9 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Film, LayoutPanelTop, ListVideo, Radio, SearchCheck, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import FilterBar from "../components/FiltersPanel";
 import Header from "../components/layout/Header";
 import SceneThumbnailBar from "../components/preview/SceneThumbnailBar";
 import SubmissionCard from "../components/SubmissionCard";
+import { clearModAuth, getModRoleId, getModSystemUserId } from "../utils/modAuth";
 
 const SceneNameModal = lazy(() => import("../components/SceneNameModal"));
 const VideoPlayerModal = lazy(() => import("../components/VideoPlayerModal"));
@@ -34,6 +36,9 @@ const LIVE_EVENT_KEY = "fanwall_live_event_id";
 const LIVE_HISTORY_KEY = "fanwall_live_scene_history";
 const ARCHIVED_SCENES_KEY = "fanwall_archived_scene_ids";
 const RECYCLE_BIN_KEY_PREFIX = "fanwall_recycle_bin_event_";
+const SPONSOR_START_KEY_PREFIX = "fanwall_scene_sponsor_start_";
+const SPONSOR_END_KEY_PREFIX = "fanwall_scene_sponsor_end_";
+const SCENE_DURATION_MS_KEY_PREFIX = "fanwall_scene_duration_ms_";
 
 function readQueue(): string[] {
   try {
@@ -80,6 +85,7 @@ function writeRecycleBin(eventId: string, items: any[]) {
 }
 
 export default function ModeratorDashboard() {
+  const navigate = useNavigate();
   const [events, setEvents] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -94,6 +100,10 @@ export default function ModeratorDashboard() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
+  const [sceneSponsorStart, setSceneSponsorStart] = useState<string>("");
+  const [sceneSponsorEnd, setSceneSponsorEnd] = useState<string>("");
+  const [sceneDurationSeconds, setSceneDurationSeconds] = useState<number>(30);
+
   const [showModal, setShowModal] = useState(false);
   const [creatingScene, setCreatingScene] = useState(false);
 
@@ -106,8 +116,45 @@ export default function ModeratorDashboard() {
   });
 
   useEffect(() => {
-    getEvents().then(setEvents);
+    const roleId = getModRoleId();
+    const systemUserId = getModSystemUserId();
+
+    if (!roleId || !systemUserId) {
+      console.warn("Missing role/system user id for role-wise events filter:", {
+        roleId,
+        systemUserId,
+      });
+    }
+
+    getEvents(roleId, systemUserId).then(setEvents);
   }, []);
+
+  const handleLogout = () => {
+    clearModAuth();
+    navigate("/login", { replace: true });
+  };
+
+  useEffect(() => {
+    if (!activeSceneId) {
+      setSceneSponsorStart("");
+      setSceneSponsorEnd("");
+      setSceneDurationSeconds(30);
+      return;
+    }
+
+    try {
+      setSceneSponsorStart(localStorage.getItem(`${SPONSOR_START_KEY_PREFIX}${activeSceneId}`) || "");
+      setSceneSponsorEnd(localStorage.getItem(`${SPONSOR_END_KEY_PREFIX}${activeSceneId}`) || "");
+      const raw = localStorage.getItem(`${SCENE_DURATION_MS_KEY_PREFIX}${activeSceneId}`) || "";
+      const ms = Number(raw);
+      const seconds = Number.isFinite(ms) && ms > 0 ? Math.round(ms / 1000) : 30;
+      setSceneDurationSeconds(seconds);
+    } catch {
+      setSceneSponsorStart("");
+      setSceneSponsorEnd("");
+      setSceneDurationSeconds(30);
+    }
+  }, [activeSceneId]);
 
   useEffect(() => {
     if (!filters.eventId) {
@@ -353,7 +400,10 @@ export default function ModeratorDashboard() {
     await Promise.all([reloadSubmissions(), reloadQueue()]);
   };
 
-  const handleCreateScene = async (name: string) => {
+  const handleCreateScene = async (
+    name: string,
+    options?: { sponsorStart?: string; sponsorEnd?: string; durationSeconds?: number },
+  ) => {
     if (creatingScene || !filters.eventId) return;
 
     if (!queue.length) {
@@ -375,8 +425,28 @@ export default function ModeratorDashboard() {
         submissionIds: queueSubmissionIds,
       });
 
+      const start = options?.sponsorStart || "";
+      const end = options?.sponsorEnd || "";
+      const durationSeconds = Math.max(6, Number(options?.durationSeconds || 30));
+      if (scene?.scene_id) {
+        try {
+          if (start) localStorage.setItem(`${SPONSOR_START_KEY_PREFIX}${scene.scene_id}`, start);
+          if (end) localStorage.setItem(`${SPONSOR_END_KEY_PREFIX}${scene.scene_id}`, end);
+          localStorage.setItem(
+            `${SCENE_DURATION_MS_KEY_PREFIX}${scene.scene_id}`,
+            String(Math.round(durationSeconds * 1000)),
+          );
+          if (start || end) localStorage.setItem("fanwall_sponsor_updated", String(Date.now()));
+        } catch {
+          // ignore
+        }
+      }
+
       setScenes((prev) => [...prev, scene]);
       setActiveSceneId(scene.scene_id);
+      setSceneSponsorStart(options?.sponsorStart || "");
+      setSceneSponsorEnd(options?.sponsorEnd || "");
+      setSceneDurationSeconds(durationSeconds);
       setShowModal(false);
       await Promise.all([reloadSubmissions(), reloadQueue(), loadScenes()]);
     } catch (err) {
@@ -443,10 +513,48 @@ export default function ModeratorDashboard() {
     await loadScenes();
   };
 
+  const handleSponsorUpload =
+    (kind: "start" | "end") => (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !activeSceneId) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        if (!result) return;
+
+        const key = `${kind === "start" ? SPONSOR_START_KEY_PREFIX : SPONSOR_END_KEY_PREFIX}${activeSceneId}`;
+        try {
+          localStorage.setItem(key, result);
+          localStorage.setItem("fanwall_sponsor_updated", String(Date.now()));
+        } catch {
+          // ignore
+        }
+
+        if (kind === "start") setSceneSponsorStart(result);
+        else setSceneSponsorEnd(result);
+      };
+      reader.readAsDataURL(file);
+    };
+
+  const clearSponsor = (kind: "start" | "end") => {
+    if (!activeSceneId) return;
+    const key = `${kind === "start" ? SPONSOR_START_KEY_PREFIX : SPONSOR_END_KEY_PREFIX}${activeSceneId}`;
+    try {
+      localStorage.removeItem(key);
+      localStorage.setItem("fanwall_sponsor_updated", String(Date.now()));
+    } catch {
+      // ignore
+    }
+    if (kind === "start") setSceneSponsorStart("");
+    else setSceneSponsorEnd("");
+  };
+
   return (
     <div className="app-shell overflow-visible">
       <div className="sticky top-0 z-50">
-        <Header title="MODERATOR DASHBOARD" color="green" />
+        <Header title="MODERATOR DASHBOARD" color="green" onLogout={handleLogout} />
       </div>
       <div className="app-content mx-auto flex min-h-screen w-full max-w-[1800px] flex-col gap-6 overflow-x-hidden px-4 py-5 md:px-6 xl:px-8">
         <section className="glass-panel rounded-[36px] p-6 md:p-8">
@@ -872,6 +980,100 @@ export default function ModeratorDashboard() {
                 <div className="hero-chip">{scenes.length} total</div>
               </div>
 
+              {activeSceneId && (
+                <div className="mb-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">Sponsor Slides</div>
+                      <div className="mt-1 text-xs text-white/55">
+                        Live sequence: 2s sponsor +{" "}
+                        {Math.max(0, sceneDurationSeconds - 4)}s videos (48/slide) + 2s sponsor ={" "}
+                        {sceneDurationSeconds}s per scene.
+                      </div>
+                    </div>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
+                      Selected: {activeSceneId}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="rounded-[18px] border border-white/10 bg-black/30 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold text-white/80">Start sponsor (2s)</div>
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleSponsorUpload("start")}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            onClick={() => clearSponsor("start")}
+                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 overflow-hidden rounded-[14px] border border-white/10 bg-black/40">
+                        {sceneSponsorStart ? (
+                          <img
+                            src={sceneSponsorStart}
+                            alt="Start sponsor"
+                            className="h-28 w-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex h-28 w-full items-center justify-center text-xs text-white/35">
+                            No image uploaded
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[18px] border border-white/10 bg-black/30 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold text-white/80">End sponsor (2s)</div>
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleSponsorUpload("end")}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            onClick={() => clearSponsor("end")}
+                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 overflow-hidden rounded-[14px] border border-white/10 bg-black/40">
+                        {sceneSponsorEnd ? (
+                          <img
+                            src={sceneSponsorEnd}
+                            alt="End sponsor"
+                            className="h-28 w-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex h-28 w-full items-center justify-center text-xs text-white/35">
+                            No image uploaded
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="min-h-0 flex-1 overflow-hidden">
                 {scenes.length ? (
                   <SceneThumbnailBar
@@ -955,10 +1157,3 @@ export default function ModeratorDashboard() {
     </div>
   );
 }
-
-
-
-
-
-
-

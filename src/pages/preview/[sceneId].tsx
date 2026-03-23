@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Header from "../../components/layout/Header";
 import Footer from "../../components/layout/Footer";
-import SceneRenderer from "../../components/SceneRenderer";
+import SceneTimedSequence from "../../components/SceneTimedSequence";
 import { useParams } from "react-router-dom";
 import { goLiveScene } from "../../api/mosaicLive.api";
 import { getSceneDetails } from "../../api/moderatorApi";
@@ -18,6 +18,7 @@ const LIVE_ACTIVE_KEY = "fanwall_live_active_scene";
 const LIVE_EVENT_KEY = "fanwall_live_event_id";
 const AUDIO_MUTED_KEY = "fanwall_audio_muted";
 
+// Keep the existing bottom sponsor ticker footer for Preview.
 const PREVIEW_SPONSORS = [
   { label: "Emirates", logoSrc: "/sponsors/emirate.png" },
   { label: "Jio", logoSrc: "/sponsors/jio-logo-icon.png" },
@@ -197,7 +198,7 @@ export default function ScenePreview() {
 
       <div className="flex-1 overflow-hidden">
         {sceneId ? (
-          <SceneRenderer sceneId={sceneId} allowDelete muted={isMuted} />
+          <SceneTimedSequence sceneId={sceneId} allowDelete muted={isMuted} />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-white/70">
             Select a scene and click Preview to show it here.

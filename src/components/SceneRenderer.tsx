@@ -23,11 +23,19 @@ export default function SceneRenderer({
   allowDelete,
   muted = true,
   showControls = false,
+  renderMode = "default",
+  slideIndex,
+  onMeta,
+  hideTileSponsor = false,
 }: {
   sceneId: any;
   allowDelete?: boolean;
   muted?: boolean;
   showControls?: boolean;
+  renderMode?: "default" | "single-slide";
+  slideIndex?: number;
+  onMeta?: (meta: { tileCount: number; totalSlides: number }) => void;
+  hideTileSponsor?: boolean;
 }) {
   const [tiles, setTiles] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -44,6 +52,10 @@ export default function SceneRenderer({
     const data = await getSceneDetails(sceneId);
     const resolvedTiles = Array.isArray(data) ? data : data?.tiles || data?.data || [];
     setTiles(resolvedTiles || []);
+
+    const tileCount = Array.isArray(resolvedTiles) ? resolvedTiles.length : 0;
+    const totalSlides = Math.max(1, Math.ceil(tileCount / TILES_PER_SLIDE));
+    onMeta?.({ tileCount, totalSlides });
   };
 
   const handleDelete = async (tileId: string) => {
@@ -58,9 +70,13 @@ export default function SceneRenderer({
 
   if (needsSlides) {
     const totalSlides = Math.ceil(count / TILES_PER_SLIDE);
+    const effectiveSlide =
+      renderMode === "single-slide"
+        ? Math.max(0, Math.min(totalSlides - 1, Number(slideIndex || 0)))
+        : currentSlide;
     const slideTiles = tiles.slice(
-      currentSlide * TILES_PER_SLIDE,
-      (currentSlide + 1) * TILES_PER_SLIDE
+      effectiveSlide * TILES_PER_SLIDE,
+      (effectiveSlide + 1) * TILES_PER_SLIDE
     );
 
     return (
@@ -90,6 +106,7 @@ export default function SceneRenderer({
                   onDelete={allowDelete ? handleDelete : undefined}
                   muted={muted}
                   startDelayMs={Math.min(index, 12) * 120}
+                  hideSponsorLogo={hideTileSponsor}
                 />
               </div>
             ))}
@@ -97,7 +114,7 @@ export default function SceneRenderer({
         </div>
 
         {/* Bottom controls — only shown when showControls=true */}
-        {showControls && (
+        {showControls && renderMode !== "single-slide" && (
           <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-black/60 backdrop-blur-md z-[100]">
             <span className="text-xs text-white/50">
               Slide {currentSlide + 1} / {totalSlides}
@@ -186,6 +203,7 @@ export default function SceneRenderer({
                   onDelete={allowDelete ? handleDelete : undefined}
                   muted={muted}
                   startDelayMs={Math.min(index, 12) * 120}
+                  hideSponsorLogo={hideTileSponsor}
                 />
               </div>
             ))}
@@ -212,6 +230,7 @@ export default function SceneRenderer({
                   onDelete={allowDelete ? handleDelete : undefined}
                   muted={muted}
                   startDelayMs={Math.min(index, 12) * 120}
+                  hideSponsorLogo={hideTileSponsor}
                 />
               </div>
             ))}

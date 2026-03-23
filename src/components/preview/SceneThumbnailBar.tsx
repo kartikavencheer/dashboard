@@ -254,9 +254,17 @@ export default function SceneThumbnailBar({
         const canDelete = true;
 
         return (
-          <button
+          <div
             key={scene.scene_id}
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(scene.scene_id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(scene.scene_id);
+              }
+            }}
             className={`
               group relative w-full overflow-hidden rounded-[28px] text-left
               transition-all duration-300
@@ -343,7 +351,7 @@ export default function SceneThumbnailBar({
                 </div>
               </div>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>

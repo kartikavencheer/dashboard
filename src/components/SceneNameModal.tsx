@@ -1,41 +1,5 @@
-import { useState } from "react";
-import { Film, Sparkles, LayoutGrid } from "lucide-react";
-
-export type GridType = "1x1" | "2x1" | "3x1" | "4x4" | "6x6" | "8x8";
-
-export const GRID_OPTIONS: { label: string; value: GridType; cols: number; rows: number }[] = [
-  { label: "1 × 1  (Single)",      value: "1x1", cols: 1, rows: 1 },
-  { label: "2 × 1  (Side by Side)", value: "2x1", cols: 2, rows: 1 },
-  { label: "3 × 1  (Trio Row)",    value: "3x1", cols: 3, rows: 1 },
-  { label: "4 × 4  (16 tiles)",    value: "4x4", cols: 4, rows: 4 },
-  { label: "6 × 6  (36 tiles)",    value: "6x6", cols: 6, rows: 6 },
-  { label: "8 × 8  (64 tiles)",    value: "8x8", cols: 8, rows: 8 },
-];
-
-export function gridConfigFromType(type: GridType) {
-  return GRID_OPTIONS.find((o) => o.value === type) ?? GRID_OPTIONS[0];
-}
-
-function GridPreview({ cols, rows }: { cols: number; rows: number }) {
-  const displayCols = Math.min(cols, 4);
-  const displayRows = Math.min(rows, 4);
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${displayCols}, 1fr)`,
-        gridTemplateRows: `repeat(${displayRows}, 1fr)`,
-        gap: "2px",
-        width: 40,
-        height: 32,
-      }}
-    >
-      {Array.from({ length: displayCols * displayRows }).map((_, i) => (
-        <div key={i} className="rounded-[2px] bg-current opacity-70" />
-      ))}
-    </div>
-  );
-}
+import { useState, type ChangeEvent } from "react";
+import { Film, Sparkles } from "lucide-react";
 
 export default function SceneNameModal({
   open,
@@ -44,15 +8,35 @@ export default function SceneNameModal({
   scenes,
 }: any) {
   const [name, setName] = useState("");
-  const [gridType, setGridType] = useState<GridType>("2x1");
+  const [sponsorStart, setSponsorStart] = useState<string>("");
+  const [sponsorEnd, setSponsorEnd] = useState<string>("");
+  const [durationSeconds, setDurationSeconds] = useState<number>(30);
 
   if (!open) return null;
 
   const exists = scenes.some(
-    (s: any) => s.name.toLowerCase() === name.toLowerCase(),
+    (s: any) => String(s.name || "").toLowerCase() === name.toLowerCase(),
   );
 
-  const selectedGrid = gridConfigFromType(gridType);
+  const readFile = (file: File, onDone: (dataUrl: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      if (result) onDone(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSponsorUpload =
+    (kind: "start" | "end") => (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file) return;
+      readFile(file, (dataUrl) => {
+        if (kind === "start") setSponsorStart(dataUrl);
+        else setSponsorEnd(dataUrl);
+      });
+    };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md">
@@ -65,7 +49,7 @@ export default function SceneNameModal({
             </div>
             <h3 className="text-2xl font-bold text-white">Create scene</h3>
             <p className="mt-2 text-sm text-white/65">
-              Give this queue a memorable name and choose a grid layout.
+              Give this queue a memorable name.
             </p>
           </div>
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-cyan-100">
@@ -73,7 +57,6 @@ export default function SceneNameModal({
           </div>
         </div>
 
-        {/* Scene name */}
         <input
           className="form-control w-full"
           placeholder="Example: Stadium Wave Intro"
@@ -81,44 +64,117 @@ export default function SceneNameModal({
           onChange={(e) => setName(e.target.value)}
         />
         {exists && (
-          <p className="mt-2 text-xs text-rose-300">A scene with this name already exists.</p>
+          <p className="mt-2 text-xs text-rose-300">
+            A scene with this name already exists.
+          </p>
         )}
 
-        {/* Grid selector */}
-        <div className="mt-5">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50">
-            <LayoutGrid size={13} />
-            Grid Layout
+        <div className="mt-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/50">
+            Scene Duration (seconds)
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {GRID_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setGridType(opt.value)}
-                className={[
-                  "flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition",
-                  gridType === opt.value
-                    ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-200"
-                    : "border-white/8 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/80",
-                ].join(" ")}
-              >
-                <GridPreview cols={opt.cols} rows={opt.rows} />
-                <span className="text-[10px] font-semibold leading-tight">{opt.value}</span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-white/40">
-            {selectedGrid.cols} × {selectedGrid.rows} ={" "}
-            {selectedGrid.cols * selectedGrid.rows} tile
-            {selectedGrid.cols * selectedGrid.rows !== 1 ? "s" : ""}
+          <input
+            type="number"
+            min={6}
+            step={1}
+            className="form-control w-full"
+            value={durationSeconds}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setDurationSeconds(Number.isFinite(next) ? next : 30);
+            }}
+          />
+          <p className="mt-2 text-xs text-white/45">
+            Minimum 6s. Sponsors stay 2s at start + 2s at end.
           </p>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-[18px] border border-white/10 bg-black/30 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold text-white/80">Start sponsor</div>
+              <label className="cursor-pointer rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSponsorUpload("start")}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-[14px] border border-white/10 bg-black/40">
+              {sponsorStart ? (
+                <img
+                  src={sponsorStart}
+                  alt="Start sponsor"
+                  className="h-20 w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-20 w-full items-center justify-center text-[11px] text-white/35">
+                  Optional
+                </div>
+              )}
+            </div>
+            {sponsorStart && (
+              <button
+                type="button"
+                onClick={() => setSponsorStart("")}
+                className="mt-2 w-full rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-[18px] border border-white/10 bg-black/30 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold text-white/80">End sponsor</div>
+              <label className="cursor-pointer rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSponsorUpload("end")}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-[14px] border border-white/10 bg-black/40">
+              {sponsorEnd ? (
+                <img
+                  src={sponsorEnd}
+                  alt="End sponsor"
+                  className="h-20 w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-20 w-full items-center justify-center text-[11px] text-white/35">
+                  Optional
+                </div>
+              )}
+            </div>
+            {sponsorEnd && (
+              <button
+                type="button"
+                onClick={() => setSponsorEnd("")}
+                className="mt-2 w-full rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 flex gap-3">
           <button
             disabled={exists || !name}
-            onClick={() => onSubmit(name, gridType)}
+            onClick={() =>
+              onSubmit(name, {
+                sponsorStart,
+                sponsorEnd,
+                durationSeconds: Math.max(6, Math.round(durationSeconds || 30)),
+              })
+            }
             className="primary-button flex-1"
           >
             Create

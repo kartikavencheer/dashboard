@@ -1,9 +1,40 @@
 const API = import.meta.env.VITE_API_URL;
 
-export const getEvents = async () => {
-  const res = await fetch(`${API}/events/live/dropdown`);
-  const json = await res.json();
-  return json.data || json || [];
+export const modLogin = (emailaddress: string, password: string) =>
+  fetch(`${API}/system-users/modlogin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      // Try common backend field variants to avoid 400s caused by naming mismatches.
+      email_address: emailaddress,
+      user_password: password,
+    }),
+  }).then(async (res) => {
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Login failed");
+    }
+
+    return data;
+  });
+
+export const getEvents = async (role_id?: string, systemuser_id?: string) => {
+  try {
+    const url =
+      role_id && systemuser_id
+        ? `${API}/events/live/dropdown/${role_id}/${systemuser_id}`
+        : `${API}/events/live/dropdown`;
+
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || json || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 export const getTeams = (eventId: string) =>

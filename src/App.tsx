@@ -1,11 +1,13 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { isModLoggedIn } from "./utils/modAuth";
 
 const ModeratorDashboard = lazy(() => import("./pages/ModeratorDashboard"));
 const LiveScreen = lazy(() => import("./pages/LiveScreen"));
 const ScenePreview = lazy(() => import("./pages/preview/[sceneId]"));
 const FanWallLivePage = lazy(() => import("./pages/FanWallLivePage"));
 const SceneEditorPage = lazy(() => import("./pages/SceneEditorPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
 
 {
   /* <Route path="/preview/:sceneId" element={<ScenePreview />} />; */
@@ -16,6 +18,14 @@ const SceneEditorPage = lazy(() => import("./pages/SceneEditorPage"));
 // }
 
 export default function App() {
+  function RequireAuth({ children }: { children: JSX.Element }) {
+    const location = useLocation();
+    if (!isModLoggedIn()) {
+      return <Navigate to="/login" replace state={{ from: location }} />;
+    }
+    return children;
+  }
+
   return (
     <BrowserRouter>
       {/* <div className="h-screen overflow-hidden"> */}
@@ -27,12 +37,13 @@ export default function App() {
         }
       >
         <Routes>
-          <Route path="/" element={<ModeratorDashboard />} />
-          <Route path="/preview" element={<ScenePreview />} />
-          <Route path="/preview/:sceneId" element={<ScenePreview />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<RequireAuth><ModeratorDashboard /></RequireAuth>} />
+          <Route path="/preview" element={<RequireAuth><ScenePreview /></RequireAuth>} />
+          <Route path="/preview/:sceneId" element={<RequireAuth><ScenePreview /></RequireAuth>} />
           <Route path="/LiveScreen/:sceneId" element={<LiveScreen />} />
           <Route path="/FanWallLivePage/:sceneId" element={<FanWallLivePage />} />
-          <Route path="/scene/:sceneId/preview" element={<SceneEditorPage />} />
+          <Route path="/scene/:sceneId/preview" element={<RequireAuth><SceneEditorPage /></RequireAuth>} />
         </Routes>
       </Suspense>
       {/* </div> */}

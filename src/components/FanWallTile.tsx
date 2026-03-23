@@ -9,6 +9,7 @@ type Props = {
   muted?: boolean;
   startDelayMs?: number;
   sponsorLogoSrc?: string;
+  hideSponsorLogo?: boolean;
 };
 
 export default function FanWallTile({
@@ -19,6 +20,7 @@ export default function FanWallTile({
   muted = true,
   startDelayMs = 0,
   sponsorLogoSrc,
+  hideSponsorLogo = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
@@ -70,7 +72,7 @@ export default function FanWallTile({
     (import.meta as any).env?.VITE_SPONSOR_LOGO_PATH as string | undefined ||
     "/sponsor-logo.svg";
 
-  const showSponsor = Boolean(sponsorSrc) && !hideSponsor;
+  const showSponsor = Boolean(sponsorSrc) && !hideSponsor && !hideSponsorLogo;
   const sponsorSizeClass = single ? "h-16 w-16" : "h-10 w-10";
   const deleteTopClass = showSponsor ? (single ? "top-20" : "top-12") : "top-2";
 
