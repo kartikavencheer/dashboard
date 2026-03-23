@@ -1,0 +1,181 @@
+import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+type Props = {
+  submission: any;
+  tile_id?: string;
+  single?: boolean;
+  onDelete?: (id: string) => void;
+  muted?: boolean;
+  startDelayMs?: number;
+  sponsorLogoSrc?: string;
+};
+
+export default function FanWallTile({
+  submission,
+  tile_id,
+  single = false,
+  onDelete,
+  muted = true,
+  startDelayMs = 0,
+  sponsorLogoSrc,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const [src, setSrc] = useState<string>("");
+  const [hideSponsor, setHideSponsor] = useState(false);
+
+  const mediaUrl =
+    submission?.media_url ||
+    submission?.submission?.media_url ||
+    submission?.video_url ||
+    submission?.submission?.video_url ||
+    submission?.url ||
+    "";
+
+  const thumbnailUrl =
+    submission?.thumbnail_url ||
+    submission?.submission?.thumbnail_url ||
+    submission?.poster_url ||
+    submission?.submission?.poster_url ||
+    "";
+
+  const userName =
+    submission?.user_name ||
+    submission?.user?.full_name ||
+    submission?.full_name ||
+    submission?.submission?.user_name ||
+    submission?.submission?.user?.full_name ||
+    "Fan";
+
+  const teamName =
+    submission?.team?.name ||
+    submission?.team_name ||
+    submission?.submission?.team?.name ||
+    submission?.submission?.team_name ||
+    "";
+
+  const teamLogoUrl =
+    submission?.logo_url ||
+    submission?.team?.logo_url ||
+    submission?.team?.logo ||
+    submission?.team_logo_url ||
+    submission?.submission?.logo_url ||
+    submission?.submission?.team?.logo_url ||
+    submission?.submission?.team_logo_url ||
+    "";
+
+  const sponsorSrc =
+    sponsorLogoSrc ||
+    (import.meta as any).env?.VITE_SPONSOR_LOGO_PATH as string | undefined ||
+    "/sponsor-logo.svg";
+
+  const showSponsor = Boolean(sponsorSrc) && !hideSponsor;
+  const sponsorSizeClass = single ? "h-16 w-16" : "h-10 w-10";
+  const deleteTopClass = showSponsor ? (single ? "top-20" : "top-12") : "top-2";
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "220px 0px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoad) return;
+    if (!mediaUrl) return;
+
+    const id = window.setTimeout(() => {
+      setSrc(mediaUrl);
+    }, Math.max(0, startDelayMs));
+
+    return () => window.clearTimeout(id);
+  }, [mediaUrl, shouldLoad, startDelayMs]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative h-full w-full overflow-hidden border border-white/10 bg-black shadow-[0_18px_40px_rgba(0,0,0,0.35)]"
+    >
+      {(teamName || teamLogoUrl || userName) && (
+        <div className="absolute left-3 top-3 z-20 flex max-w-[70%] items-center gap-2 rounded-2xl border border-white/10 bg-black/45 px-2.5 py-2 text-white backdrop-blur-md">
+          {teamLogoUrl && String(teamLogoUrl).trim() !== "" && (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06]">
+              <img
+                src={teamLogoUrl}
+                alt="team logo"
+                className="h-6 w-6 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+          )}
+
+          <div className="min-w-0 leading-tight">
+            {teamName && (
+              <div className="truncate text-[12px] font-semibold">{teamName}</div>
+            )}
+            <div className="truncate text-[11px] font-medium text-white/85">
+              {userName}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSponsor && (
+        <div
+          className={`absolute right-2 top-2 z-20 flex ${sponsorSizeClass} items-center justify-center rounded-lg bg-white/95 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.22)] ring-1 ring-black/10`}
+        >
+          <img
+            src={sponsorSrc}
+            alt="sponsor logo"
+            className="h-full w-full object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+              setHideSponsor(true);
+            }}
+          />
+        </div>
+      )}
+
+      {onDelete && tile_id && (
+        <button
+          onClick={() => onDelete(tile_id)}
+          aria-label="Delete tile"
+          title="Delete from scene"
+          className={`absolute right-2 z-20 ${deleteTopClass} rounded-full bg-black/65 p-1.5 text-white transition hover:bg-red-600`}
+        >
+          <X size={18} />
+        </button>
+      )}
+
+      <video
+        src={src || undefined}
+        autoPlay
+        muted={muted}
+        loop
+        playsInline
+        preload={src ? "metadata" : "none"}
+        poster={thumbnailUrl || undefined}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 py-3 text-sm font-semibold text-white">
+        {userName}
+      </div>
+    </div>
+  );
+}
